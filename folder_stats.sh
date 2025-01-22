@@ -34,8 +34,16 @@ for folder in "$INPUT_PATH"/*; do
         FOLDER_COUNT=$(find "$folder" -maxdepth 1 -type d | wc -l)
         FOLDER_COUNT=$((FOLDER_COUNT - 1))  # Exclude the folder itself
 
-        # Calculate total size of the folder
-        SIZE=$(du -sb "$folder" | awk '{print $1}')  # Size in bytes
+        # Detect OS and set DU_FLAG accordingly
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            DU_FLAG="-sk"  # macOS (size in KB)
+        else
+            DU_FLAG="-sb"  # Linux (size in bytes)
+        fi
+
+        # Use the appropriate flag
+        SIZE=$(du $DU_FLAG "$folder" | awk '{print $1}')
+        MAIN_SIZE=$(du $DU_FLAG "$INPUT_PATH" | awk '{print $1}')
 
         # Print details for each subfolder
         echo "$(basename "$folder") $FILE_COUNT $FOLDER_COUNT $SIZE"
