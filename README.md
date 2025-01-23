@@ -13,14 +13,37 @@ Calculate statistics for a given folder by analyzing all its direct subfolders (
 `./folder_stats.sh /absolute/path/to/main`
 Expected output
 
-**Sample Output** 
+** Example Structure**
+```
+/absolute/path/to/main/
+│── main.sh
+│── .DS_Store      ❌ (Ignored)
+│── temp.log       ❌ (Ignored)
+│── sub1/
+│   ├── sub1.sh
+│   ├── data/
+│   │   ├── data1.txt
+│   │   ├── .DS_Store ❌ (Ignored)
+│   │   └── temp.log ❌ (Ignored)
+│   ├── .@__thumb/   ❌ (Ignored)
+│   │   ├── thumb1.jpg
+│   │   └── thumb2.jpg
+│── sub2/
+│   ├── sub2.sh
+│   ├── backup/      ❌ (Ignored)
+│   └── temp_folder/ ❌ (Ignored)
+│       ├── ignored.txt
+│       ├── ignored2.txt
+```
+
+**Expected Output** 
 
 ```sh
 📂 Processing folder: /absolute/path/to/main
 ----------------------------------------
-sub1 1 0 1234
-sub2 2 0 2345
+Folder,Files,Subfolders,Total Items,Size(Bytes)
+sub1,1,1,2,12345
+sub2,1,0,1,8567
 ----------------------------------------
-Total 4 2 5678
+Total,2,2,4,20912
 ```
-(Where 1234, 2345, 5678 are folder sizes in bytes.)

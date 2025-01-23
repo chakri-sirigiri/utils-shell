@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Define files and folders to ignore (space-separated)
+IGNORE_FILES=".DS_Store anotherfile.txt temp.log"
+IGNORE_FOLDERS=".@__thumb .dtrash backup"
+
 # Check if an argument is provided
 if [[ -z "$1" ]]; then
     echo "❌ Error: No folder path provided."
@@ -18,54 +22,113 @@ fi
 
 echo "📂 Processing folder: $INPUT_PATH"
 echo "----------------------------------------"
-echo "Folder,Files,Subfolders,Size(Bytes)"
+echo "Folder,Files,Subfolders,Total Items,Size(Bytes)"
 
 # Function to get folder size in bytes (Cross-platform)
 get_size() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
         du -sk "$1" | awk '{print $1 * 1024}'  # Convert KB to Bytes (macOS)
     else
-        du -sb "$1" | awk '{print $1}'         # Get Bytes directly (Linux)
+        du -sb "$1" | awk '{print $1}'         # Get Bytes directly (Linux/QNAP)
     fi
 }
 
-# Initialize counters for summary
+# Function to count valid files and folders manually (BusyBox-compatible)
+count_files() {
+    local dir="$1"
+    local count=0
+    while IFS= read -r file; do
+        skip=false
+        for ignore in $IGNORE_FILES; do
+            [[ "$file" == *"$ignore" ]] && skip=true && break
+        done
+        for ignore in $IGNORE_FOLDERS; do
+            [[ "$file" == *"$ignore"* ]] && skip=true && break
+        done
+        $skip || ((count++))
+    done < <(find "$dir" -type f)
+    echo "$count"
+}
+
+count_folders() {
+    local dir="$1"
+    local count=0
+    while IFS= read -r folder; do
+        skip=false
+        for ignore in $IGNORE_FOLDERS; do
+            [[ "$folder" == *"$ignore"* ]] && skip=true && break
+        done
+        $skip || ((count++))
+    done < <(find "$dir" -type d)
+    echo "$((count - 1))"  # Exclude the base folder itself
+}
+
+# Initialize summary totals
 TOTAL_FILES=0
 TOTAL_FOLDERS=0
+TOTAL_ITEMS=0
 TOTAL_SIZE=0
 
 # Loop through each subfolder inside the input path
 for folder in "$INPUT_PATH"/*; do
     if [[ -d "$folder" ]]; then
-        # Count files **recursively** (all levels)
-        FILE_COUNT=$(find "$folder" -type f | wc -l)
+        # Check if this folder is in the IGNORE_FOLDERS list
+        for f in $IGNORE_FOLDERS; do
+            [[ "$(basename "$folder")" == "$f" ]] && continue 2
+        done
 
-        # Count subfolders **recursively**, excluding the folder itself
-        FOLDER_COUNT=$(find "$folder" -type d | wc -l)
-        FOLDER_COUNT=$((FOLDER_COUNT - 1))
+        # Count files and folders manually
+        FILE_COUNT=$(count_files "$folder")
+        FOLDER_COUNT=$(count_folders "$folder")
 
-        # Get folder size (in bytes)
+        # Calculate total items (files + folders)
+        TOTAL_ITEM_COUNT=$((FILE_COUNT + FOLDER_COUNT))
+
+        # Get folder size
         SIZE=$(get_size "$folder")
 
         # Update summary totals
         TOTAL_FILES=$((TOTAL_FILES + FILE_COUNT))
         TOTAL_FOLDERS=$((TOTAL_FOLDERS + FOLDER_COUNT))
+        TOTAL_ITEMS=$((TOTAL_ITEMS + TOTAL_ITEM_COUNT))
         TOTAL_SIZE=$((TOTAL_SIZE + SIZE))
 
-        # Print details for each subfolder **without commas in size**
-        echo "$(basename "$folder"),$FILE_COUNT,$FOLDER_COUNT,$SIZE"
+        # Print details for each subfolder
+        echo "$(basename "$folder"),$FILE_COUNT,$FOLDER_COUNT,$TOTAL_ITEM_COUNT,$SIZE"
     fi
 done
 
-# Include the input folder itself
-MAIN_FILE_COUNT=$(find "$INPUT_PATH" -type f | wc -l)
-MAIN_FOLDER_COUNT=$(find "$INPUT_PATH" -type d | wc -l)
-MAIN_FOLDER_COUNT=$((MAIN_FOLDER_COUNT - 1))
+# Count **only** additional files in the main directory (excluding ignored files)
+MAIN_FILE_COUNT=0
+while IFS= read -r file; do
+    skip=false
+    for ignore in $IGNORE_FILES; do
+        [[ "$file" == *"$ignore" ]] && skip=true && break
+    done
+    $skip || ((MAIN_FILE_COUNT++))
+done < <(find "$INPUT_PATH" -maxdepth 1 -type f)
+
+# Count **only** direct subfolders in the main directory (excluding ignored folders)
+MAIN_FOLDER_COUNT=0
+while IFS= read -r folder; do
+    skip=false
+    for ignore in $IGNORE_FOLDERS; do
+        [[ "$folder" == *"$ignore"* ]] && skip=true && break
+    done
+    $skip || ((MAIN_FOLDER_COUNT++))
+done < <(find "$INPUT_PATH" -maxdepth 1 -type d)
+
+# Total items in main folder
+MAIN_TOTAL_ITEMS=$((MAIN_FILE_COUNT + MAIN_FOLDER_COUNT))
+
+# Get main folder size
 MAIN_SIZE=$(get_size "$INPUT_PATH")
 
-TOTAL_FILES=$((TOTAL_FILES + MAIN_FILE_COUNT))
-TOTAL_FOLDERS=$((TOTAL_FOLDERS + 1))  # Count the main folder itself
-TOTAL_SIZE=$((TOTAL_SIZE + MAIN_SIZE))
+# Final summary (reuse accumulated totals and just add main folder values)
+GRAND_TOTAL_FILES=$((TOTAL_FILES + MAIN_FILE_COUNT))
+GRAND_TOTAL_FOLDERS=$((TOTAL_FOLDERS + 1))  # Count the main folder itself
+GRAND_TOTAL_ITEMS=$((TOTAL_ITEMS + MAIN_TOTAL_ITEMS))
+GRAND_TOTAL_SIZE=$((TOTAL_SIZE + MAIN_SIZE))
 
 echo "----------------------------------------"
-echo "Total,$TOTAL_FILES,$TOTAL_FOLDERS,$TOTAL_SIZE"
+echo "Total,$GRAND_TOTAL_FILES,$GRAND_TOTAL_FOLDERS,$GRAND_TOTAL_ITEMS,$GRAND_TOTAL_SIZE"
