@@ -22,7 +22,7 @@ fi
 
 echo "📂 Processing folder: $INPUT_PATH"
 echo "----------------------------------------"
-echo "Folder,Files,Subfolders,Total Items,Size(Bytes)"
+echo "Folder,Files,Subfolders,Total Items,Size(Bytes),Human Readable Size"
 
 # Function to get folder size in bytes (Cross-platform)
 get_size() {
@@ -31,6 +31,18 @@ get_size() {
     else
         du -sb "$1" | awk '{print $1}'         # Get Bytes directly (Linux/QNAP)
     fi
+}
+
+# Function to convert size in bytes to human-readable format
+human_readable_size() {
+    local size=$1
+    local units=("B" "KB" "MB" "GB" "TB" "PB")
+    local i=0
+    while ((size >= 1024)) && ((i < ${#units[@]} - 1)); do
+        size=$((size / 1024))
+        i=$((i + 1))
+    done
+    echo "$size ${units[$i]}"
 }
 
 # Function to count valid files and folders manually (BusyBox-compatible)
@@ -87,6 +99,9 @@ for folder in "$INPUT_PATH"/*; do
         # Get folder size
         SIZE=$(get_size "$folder")
 
+        # Convert to human-readable size
+        HUMAN_READABLE_SIZE=$(human_readable_size "$SIZE")
+
         # Update summary totals
         TOTAL_FILES=$((TOTAL_FILES + FILE_COUNT))
         TOTAL_FOLDERS=$((TOTAL_FOLDERS + FOLDER_COUNT))
@@ -94,7 +109,7 @@ for folder in "$INPUT_PATH"/*; do
         TOTAL_SIZE=$((TOTAL_SIZE + SIZE))
 
         # Print details for each subfolder
-        echo "$(basename "$folder"),$FILE_COUNT,$FOLDER_COUNT,$TOTAL_ITEM_COUNT,$SIZE"
+        echo "$(basename "$folder"),$FILE_COUNT,$FOLDER_COUNT,$TOTAL_ITEM_COUNT,$SIZE,$HUMAN_READABLE_SIZE"
     fi
 done
 
@@ -124,11 +139,15 @@ MAIN_TOTAL_ITEMS=$((MAIN_FILE_COUNT + MAIN_FOLDER_COUNT))
 # Get main folder size
 MAIN_SIZE=$(get_size "$INPUT_PATH")
 
+# Convert to human-readable size
+MAIN_HUMAN_READABLE_SIZE=$(human_readable_size "$MAIN_SIZE")
+
 # Final summary (reuse accumulated totals and just add main folder values)
 GRAND_TOTAL_FILES=$((TOTAL_FILES + MAIN_FILE_COUNT))
 GRAND_TOTAL_FOLDERS=$((TOTAL_FOLDERS + 1))  # Count the main folder itself
 GRAND_TOTAL_ITEMS=$((TOTAL_ITEMS + MAIN_TOTAL_ITEMS))
 GRAND_TOTAL_SIZE=$((TOTAL_SIZE + MAIN_SIZE))
 
+# Print final summary with human-readable size
 echo "----------------------------------------"
-echo "Total,$GRAND_TOTAL_FILES,$GRAND_TOTAL_FOLDERS,$GRAND_TOTAL_ITEMS,$GRAND_TOTAL_SIZE"
+echo "Total,$GRAND_TOTAL_FILES,$GRAND_TOTAL_FOLDERS,$GRAND_TOTAL_ITEMS,$GRAND_TOTAL_SIZE,$MAIN_HUMAN_READABLE_SIZE"
