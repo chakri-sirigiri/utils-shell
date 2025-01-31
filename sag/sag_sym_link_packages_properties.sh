@@ -112,21 +112,23 @@ done
 
 read -p "Select property files to link (comma-separated, or 0 for all): " file_choice
 
-# Create symlinks for property files
+# Create symlinks for property files using ABSOLUTE paths
 if [[ "$file_choice" == "0" ]]; then
     echo "Linking all property files for environment $SELECTED_ENV..."
     for file in "${AVAILABLE_PROPERTY_FILES[@]}"; do
+        absolute_source="$(realpath "$SELECTED_PROPERTIES_DIR/$file")"
         clean_name=$(echo "$file" | cut -d'_' -f2-)  # Remove env prefix
-        ln -sfn "$SELECTED_PROPERTIES_DIR/$file" "$IS_HOME/properties/$clean_name"
-        echo "Linked $file as $clean_name"
+        ln -sfn "$absolute_source" "$IS_HOME/properties/$clean_name"
+        echo "Linked $absolute_source as $clean_name"
     done
 else
     IFS=',' read -ra selected_files <<< "$file_choice"
     for idx in "${selected_files[@]}"; do
         file="${AVAILABLE_PROPERTY_FILES[$((idx-1))]}"
+        absolute_source="$(realpath "$SELECTED_PROPERTIES_DIR/$file")"
         clean_name=$(echo "$file" | cut -d'_' -f2-)  # Remove env prefix
-        ln -sfn "$SELECTED_PROPERTIES_DIR/$file" "$IS_HOME/properties/$clean_name"
-        echo "Linked $file as $clean_name"
+        ln -sfn "$absolute_source" "$IS_HOME/properties/$clean_name"
+        echo "Linked $absolute_source as $clean_name"
     done
 fi
 
